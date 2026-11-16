@@ -21,7 +21,7 @@ Requires macOS 11 or later, Apple silicon or Intel.
 
 ```sh
 brew tap aragabz/miqat https://github.com/aragabz/miqat
-brew install --cask miqat
+brew install --cask aragabz/miqat/miqat
 ```
 
 Upgrade later with `brew upgrade --cask miqat`.

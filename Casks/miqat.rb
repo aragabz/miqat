@@ -8,15 +8,14 @@ cask "miqat" do
   desc "Prayer times in the menu bar"
   homepage "https://github.com/aragabz/miqat"
 
-  depends_on macos: ">= :big_sur"
+  depends_on :macos
 
   app "Miqat.app"
 
   # The app is ad-hoc signed, not notarized, so Gatekeeper would refuse to open
   # it while the download quarantine flag is set.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/Miqat.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/Miqat.app"]
   end
 
   uninstall quit: "app.miqat.desktop"
