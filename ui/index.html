@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Miqat</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <!-- Today -->
+      <section id="view-today" class="view">
+        <header class="top">
+          <div>
+            <div id="place" class="place">—</div>
+            <div id="dates" class="dates"></div>
+          </div>
+          <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            </svg>
+          </button>
+        </header>
+
+        <div id="setup" class="setup" hidden>
+          <p>Choose your location to see today's prayer times.</p>
+          <button id="setup-btn" class="primary">Set location</button>
+        </div>
+
+        <div id="today-body">
+          <div class="hero">
+            <div class="hero-label">Next prayer</div>
+            <div id="next-name" class="hero-name">—</div>
+            <div id="countdown" class="hero-count">--:--:--</div>
+            <div id="next-at" class="hero-at"></div>
+            <button id="stop-adhan" class="pill" hidden>Stop adhan</button>
+          </div>
+
+          <ul id="prayers" class="prayers"></ul>
+
+          <div class="qibla">
+            <svg id="compass" viewBox="0 0 100 100" width="64" height="64" aria-hidden="true">
+              <circle cx="50" cy="50" r="46" class="dial" />
+              <text x="50" y="17" class="cardinal">N</text>
+              <text x="50" y="92" class="cardinal">S</text>
+              <text x="88" y="54" class="cardinal">E</text>
+              <text x="12" y="54" class="cardinal">W</text>
+              <g id="needle">
+                <path d="M50 14 L57 50 L50 44 L43 50 Z" class="needle" />
+                <circle cx="50" cy="50" r="3.5" class="hub" />
+              </g>
+            </svg>
+            <div>
+              <div class="qibla-label">Qibla</div>
+              <div id="qibla-deg" class="qibla-deg">—</div>
+              <div class="qibla-note">clockwise from true north</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section id="view-settings" class="view" hidden>
+        <header class="top">
+          <button id="close-settings" class="icon-btn" title="Back" aria-label="Back">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+          </button>
+          <div class="place">Settings</div>
+          <span class="spacer"></span>
+        </header>
+
+        <div class="scroll">
+          <h2>Location</h2>
+          <div class="row-inline">
+            <input id="city-query" type="search" placeholder="Search city…" autocomplete="off" />
+            <button id="city-search">Search</button>
+          </div>
+          <ul id="city-results" class="results"></ul>
+          <button id="detect" class="link">Detect from my internet connection</button>
+          <label>Name <input id="loc-name" type="text" placeholder="e.g. Vienna" /></label>
+          <div class="row-inline">
+            <label>Latitude <input id="lat" type="number" step="0.0001" min="-90" max="90" /></label>
+            <label>Longitude <input id="lng" type="number" step="0.0001" min="-180" max="180" /></label>
+          </div>
+          <p id="loc-status" class="status"></p>
+
+          <h2>Calculation</h2>
+          <label>Method
+            <select id="method">
+              <option value="MuslimWorldLeague">Muslim World League</option>
+              <option value="Egyptian">Egyptian General Authority</option>
+              <option value="Karachi">University of Islamic Sciences, Karachi</option>
+              <option value="UmmAlQura">Umm al-Qura, Makkah</option>
+              <option value="Dubai">Dubai</option>
+              <option value="MoonsightingCommittee">Moonsighting Committee</option>
+              <option value="NorthAmerica">ISNA (North America)</option>
+              <option value="Kuwait">Kuwait</option>
+              <option value="Qatar">Qatar</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Tehran">Tehran</option>
+              <option value="Turkey">Diyanet (Turkey)</option>
+            </select>
+          </label>
+          <label>Asr
+            <select id="madhab">
+              <option value="shafi">Standard (Shafi, Maliki, Hanbali)</option>
+              <option value="hanafi">Hanafi</option>
+            </select>
+          </label>
+
+          <h2>Alerts</h2>
+          <label class="check"><input id="notifications" type="checkbox" /> Show a notification at prayer time</label>
+          <label class="check"><input id="adhan" type="checkbox" /> Play the adhan</label>
+          <div class="file">
+            <span id="adhan-file" class="file-name">Built-in adhan</span>
+            <button id="choose-adhan">Choose…</button>
+            <button id="reset-adhan" title="Use the built-in adhan">Reset</button>
+            <button id="preview-adhan">Play</button>
+          </div>
+          <label>Reminder before prayer
+            <select id="reminder">
+              <option value="0">Off</option>
+              <option value="5">5 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+            </select>
+          </label>
+          <div class="mutes" id="mutes"></div>
+
+          <h2>Display</h2>
+          <label>Menu bar shows
+            <select id="menubar-mode">
+              <option value="countdown">Countdown to next prayer</option>
+              <option value="time">Time of next prayer</option>
+              <option value="icon">Icon only</option>
+            </select>
+          </label>
+          <label class="check"><input id="hour24" type="checkbox" /> 24-hour clock</label>
+          <label class="check"><input id="autostart" type="checkbox" /> Launch at login</label>
+
+          <p id="save-status" class="status"></p>
+          <button id="quit" class="danger">Quit Miqat</button>
+        </div>
+      </section>
+    </main>
+    <script src="main.js"></script>
+  </body>
+</html>

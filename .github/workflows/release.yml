@@ -1,0 +1,82 @@
+name: Release
+
+# Push a tag like v0.2.0 (matching the version in src-tauri/tauri.conf.json)
+# to build the universal DMG, publish a GitHub release and update the cask.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha256: ${{ steps.publish.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches the app version
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          configured="$(jq -r .version src-tauri/tauri.conf.json)"
+          if [ "$version" != "$configured" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match tauri.conf.json version $configured"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build universal app
+        run: bun run tauri build --target universal-apple-darwin
+
+      - name: Publish GitHub release
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dmg="src-tauri/target/universal-apple-darwin/release/bundle/dmg/Miqat_${VERSION}_universal.dmg"
+          echo "sha256=$(shasum -a 256 "$dmg" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          gh release create "$GITHUB_REF_NAME" "$dmg" \
+            --title "Miqat $VERSION" --generate-notes
+
+  cask:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Point the cask at the new release
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          SHA256: ${{ needs.build.outputs.sha256 }}
+        run: |
+          sed -i -E \
+            -e "s/^  version \".*\"/  version \"$VERSION\"/" \
+            -e "s/^  sha256 \".*\"/  sha256 \"$SHA256\"/" \
+            Casks/miqat.rb
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Update cask to $VERSION"
+          git push origin main
