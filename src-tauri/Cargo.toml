@@ -1,6 +1,6 @@
 [package]
 name = "miqat"
-version = "0.1.0"
+version = "0.2.0"
 description = "Prayer times in your menu bar"
 edition = "2021"
 

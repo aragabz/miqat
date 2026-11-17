@@ -25,7 +25,9 @@
 
         <div id="setup" class="setup" hidden>
           <p>Choose your location to see today's prayer times.</p>
-          <button id="setup-btn" class="primary">Set location</button>
+          <button id="setup-detect" class="primary">Use my location</button>
+          <button id="setup-btn" class="link">Choose a city instead</button>
+          <p id="setup-status" class="status"></p>
         </div>
 
         <div id="today-body">
@@ -78,6 +80,7 @@
           </div>
           <ul id="city-results" class="results"></ul>
           <button id="detect" class="link">Detect from my internet connection</button>
+          <label class="check"><input id="auto-location" type="checkbox" /> Update automatically when I travel</label>
           <label>Name <input id="loc-name" type="text" placeholder="e.g. Vienna" /></label>
           <div class="row-inline">
             <label>Latitude <input id="lat" type="number" step="0.0001" min="-90" max="90" /></label>

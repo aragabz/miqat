@@ -259,6 +259,11 @@ body {
   color: var(--muted);
 }
 
+.setup button {
+  display: block;
+  margin: 10px auto 0;
+}
+
 /* Settings */
 
 .scroll {

@@ -13,7 +13,10 @@ from your coordinates, so it works offline once a location is set.
 - Notifications and adhan at prayer time, with a per-prayer mute and an
   optional reminder 5 to 30 minutes before
 - Bundled adhan recording, or pick your own audio file
-- City search or automatic location, 12 or 24-hour clock, launch at login
+- One-click location detection, city search or manual coordinates
+- Optional travel mode that notices when you are in another city and updates
+  the times for you
+- 12 or 24-hour clock, launch at login
 
 ## Install
 
@@ -39,12 +42,19 @@ The Homebrew cask does this for you.
 
 ## Privacy
 
-Miqat has no account and no analytics. It makes network requests only when you
-ask it to find a location: city search goes to
-[Open-Meteo geocoding](https://open-meteo.com/en/docs/geocoding-api), and
-"Detect from my internet connection" looks up your approximate position from
-your IP address via
-[ipwho.is](https://ipwho.is). Entering coordinates by hand makes no requests.
+Miqat has no account and no analytics. It makes network requests only to find
+a location:
+
+- City search sends what you type to
+  [Open-Meteo geocoding](https://open-meteo.com/en/docs/geocoding-api).
+- "Use my location" and "Detect from my internet connection" look up your
+  approximate position from your IP address via [ipwho.is](https://ipwho.is).
+- "Update automatically when I travel" is off by default. When on, it repeats
+  that IP lookup at launch, after wake and every 30 minutes, and switches
+  location only if you are at least 25 km from the saved one. A VPN makes it
+  follow the VPN's city.
+
+Entering coordinates by hand makes no requests.
 
 ## Build from source
 

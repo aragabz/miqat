@@ -136,6 +136,7 @@ function fillSettings() {
   $("menubar-mode").value = s.menubarMode;
   $("hour24").checked = s.hour24;
   $("autostart").checked = s.autostart;
+  $("auto-location").checked = s.autoLocation;
   renderMutes();
 }
 
@@ -187,10 +188,11 @@ async function saveLocation(name, latitude, longitude) {
     setStatus("loc-status", "Latitude must be within ±90 and longitude within ±180.", true);
     return;
   }
-  const ok = await save({ configured: true, locationName: name, latitude, longitude });
+  // A hand-picked place must not be replaced by the next background check.
+  const ok = await save({ configured: true, locationName: name, latitude, longitude, autoLocation: false });
   if (ok) {
     fillSettings();
-    setStatus("loc-status", `Using ${name || "custom location"} (${latitude.toFixed(4)}, ${longitude.toFixed(4)}).`);
+    setStatus("loc-status", usingLine(snap.settings));
   }
 }
 
@@ -227,16 +229,28 @@ async function searchCity() {
   }
 }
 
-async function detectLocation() {
-  setStatus("loc-status", "Detecting…");
+function usingLine(s) {
+  return `Using ${s.locationName || "custom location"} (${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}).`;
+}
+
+async function detectLocation(statusId) {
+  setStatus(statusId, "Detecting…");
   try {
-    const res = await fetch("https://ipwho.is/");
-    const data = await res.json();
-    if (!res.ok || data.success === false) throw new Error(data.message || `HTTP ${res.status}`);
-    await saveLocation(data.city || "", Number(data.latitude), Number(data.longitude));
+    snap = await invoke("detect_location");
+    renderToday();
+    fillSettings();
+    setStatus(statusId, statusId === "loc-status" ? usingLine(snap.settings) : "");
   } catch (err) {
-    setStatus("loc-status", `Could not detect location (${err.message}). Search for your city instead.`, true);
+    setStatus(statusId, `Could not detect your location (${err}). Search for your city instead.`, true);
   }
+}
+
+async function setAutoLocation(on) {
+  if (!(await save({ autoLocation: on }))) return;
+  setStatus(
+    "loc-status",
+    on ? "Checked every 30 minutes from your internet connection. A VPN will show the VPN's city." : "",
+  );
 }
 
 function manualLocation() {
@@ -253,7 +267,9 @@ $("city-search").addEventListener("click", searchCity);
 $("city-query").addEventListener("keydown", (e) => {
   if (e.key === "Enter") searchCity();
 });
-$("detect").addEventListener("click", detectLocation);
+$("detect").addEventListener("click", () => detectLocation("loc-status"));
+$("setup-detect").addEventListener("click", () => detectLocation("setup-status"));
+$("auto-location").addEventListener("change", (e) => setAutoLocation(e.target.checked));
 $("lat").addEventListener("change", manualLocation);
 $("lng").addEventListener("change", manualLocation);
 $("loc-name").addEventListener("change", () => {

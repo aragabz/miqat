@@ -62,6 +62,8 @@ struct Settings {
     /// Minutes before each prayer to post a reminder; 0 disables it.
     reminder_minutes: u32,
     autostart: bool,
+    /// Re-check the location in the background and follow it when it moves.
+    auto_location: bool,
 }
 
 impl Default for Settings {
@@ -81,6 +83,7 @@ impl Default for Settings {
             muted: Vec::new(),
             reminder_minutes: 0,
             autostart: false,
+            auto_location: false,
         }
     }
 }
@@ -407,6 +410,121 @@ fn start_ticker(app: AppHandle) {
     });
 }
 
+// ---------------------------------------------------------------- location
+
+const IP_LOOKUP_URL: &str = "https://ipwho.is/";
+/// How often the saved location is re-checked while following is on.
+const FOLLOW_INTERVAL_SECONDS: i64 = 30 * 60;
+/// IP lookups wobble within a city; only a move at least this far counts.
+const MOVED_KM: f64 = 25.0;
+
+#[derive(Debug, Clone, PartialEq)]
+struct Place {
+    name: String,
+    latitude: f64,
+    longitude: f64,
+}
+
+fn parse_place(body: &str) -> Result<Place, String> {
+    let value: serde_json::Value = serde_json::from_str(body)
+        .map_err(|_| "unexpected reply from the location service".to_string())?;
+    if value["success"].as_bool() == Some(false) {
+        let reason = value["message"].as_str().unwrap_or("the location service refused the request");
+        return Err(reason.to_string());
+    }
+    match (value["latitude"].as_f64(), value["longitude"].as_f64()) {
+        (Some(latitude), Some(longitude)) if latitude.abs() <= 90.0 && longitude.abs() <= 180.0 => Ok(Place {
+            name: value["city"].as_str().unwrap_or_default().to_string(),
+            latitude,
+            longitude,
+        }),
+        _ => Err("the location service returned no coordinates".to_string()),
+    }
+}
+
+/// Approximate location of this Mac's internet connection. Blocks for up to ten seconds.
+fn lookup_place() -> Result<Place, String> {
+    let output = Command::new("/usr/bin/curl")
+        .args(["-sS", "--max-time", "10", IP_LOOKUP_URL])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err("could not reach the location service".to_string());
+    }
+    parse_place(&String::from_utf8_lossy(&output.stdout))
+}
+
+/// Great-circle distance in kilometres.
+fn distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let (p1, p2) = (lat1.to_radians(), lat2.to_radians());
+    let a = ((p2 - p1) / 2.0).sin().powi(2)
+        + p1.cos() * p2.cos() * ((lon2 - lon1).to_radians() / 2.0).sin().powi(2);
+    2.0 * 6371.0 * a.sqrt().asin()
+}
+
+fn has_moved(settings: &Settings, place: &Place) -> bool {
+    !settings.configured
+        || distance_km(settings.latitude, settings.longitude, place.latitude, place.longitude) >= MOVED_KM
+}
+
+fn apply_place(app: &AppHandle, place: Place) -> Result<Snapshot, String> {
+    let state = app.state::<AppState>();
+    let mut current = state.settings.lock().unwrap();
+    let mut settings = current.clone();
+    settings.configured = true;
+    settings.location_name = place.name;
+    settings.latitude = place.latitude;
+    settings.longitude = place.longitude;
+    store_settings(app, &settings)?;
+    *current = settings.clone();
+    drop(current);
+    let _ = app.emit("schedule-changed", ());
+    Ok(snapshot(&settings, Utc::now()))
+}
+
+/// One background check: adopt the detected place if it is far from the saved one.
+fn follow_location(app: &AppHandle) -> Result<(), String> {
+    let place = lookup_place()?;
+    // Read the settings after the slow lookup so a change made meanwhile wins.
+    let settings = app.state::<AppState>().settings.lock().unwrap().clone();
+    if !settings.auto_location || !has_moved(&settings, &place) {
+        return Ok(());
+    }
+    let name = if place.name.is_empty() { "your new location".to_string() } else { place.name.clone() };
+    apply_place(app, place)?;
+    if settings.notifications {
+        notify(app, "Location updated", &format!("Prayer times now follow {name}."));
+    }
+    Ok(())
+}
+
+fn start_location_follower(app: AppHandle) {
+    thread::spawn(move || {
+        let mut prev = Utc::now();
+        let mut due = prev;
+        loop {
+            thread::sleep(StdDuration::from_secs(5));
+            let now = Utc::now();
+            let woke = now - prev > Duration::seconds(120) || now < prev;
+            prev = now;
+            if !app.state::<AppState>().settings.lock().unwrap().auto_location {
+                // Check straight away once the setting is switched on.
+                due = now;
+                continue;
+            }
+            if woke {
+                // Give the network a moment to come back after sleep.
+                due = now + Duration::seconds(15);
+            }
+            if now < due {
+                continue;
+            }
+            let wait = if follow_location(&app).is_ok() { FOLLOW_INTERVAL_SECONDS } else { 60 };
+            due = Utc::now() + Duration::seconds(wait);
+        }
+    });
+}
+
 // ----------------------------------------------------------------- popover
 
 fn toggle_popover(app: &AppHandle, rect: Rect) {
@@ -470,6 +588,14 @@ fn save_settings(app: AppHandle, state: State<AppState>, settings: Settings) -> 
 }
 
 #[tauri::command]
+async fn detect_location(app: AppHandle) -> Result<Snapshot, String> {
+    let place = tauri::async_runtime::spawn_blocking(lookup_place)
+        .await
+        .map_err(|e| e.to_string())??;
+    apply_place(&app, place)
+}
+
+#[tauri::command]
 async fn pick_adhan(app: AppHandle) -> Option<String> {
     let state = app.state::<AppState>();
     state.pinned.store(true, Ordering::SeqCst);
@@ -517,6 +643,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_snapshot,
             save_settings,
+            detect_location,
             pick_adhan,
             preview_adhan,
             stop_adhan,
@@ -570,7 +697,8 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            start_ticker(handle);
+            start_ticker(handle.clone());
+            start_location_follower(handle);
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -590,6 +718,34 @@ mod tests {
             longitude: 16.3738,
             ..Settings::default()
         }
+    }
+
+    #[test]
+    fn place_is_read_from_the_lookup_reply() {
+        let place = parse_place(r#"{"success":true,"city":"Vienna","latitude":48.2082,"longitude":16.3738}"#);
+        assert_eq!(
+            place,
+            Ok(Place { name: "Vienna".into(), latitude: 48.2082, longitude: 16.3738 })
+        );
+    }
+
+    #[test]
+    fn failed_or_incomplete_lookups_are_errors() {
+        assert_eq!(
+            parse_place(r#"{"success":false,"message":"Reserved range"}"#),
+            Err("Reserved range".to_string())
+        );
+        assert!(parse_place(r#"{"success":true,"city":"Nowhere"}"#).is_err());
+        assert!(parse_place("<html>captive portal</html>").is_err());
+    }
+
+    #[test]
+    fn only_a_move_to_another_city_counts() {
+        let across_town = Place { name: "Vienna".into(), latitude: 48.25, longitude: 16.45 };
+        let bratislava = Place { name: "Bratislava".into(), latitude: 48.1486, longitude: 17.1077 };
+        assert!(!has_moved(&vienna(), &across_town));
+        assert!(has_moved(&vienna(), &bratislava));
+        assert!(has_moved(&Settings::default(), &across_town));
     }
 
     #[test]
