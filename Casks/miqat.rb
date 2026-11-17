@@ -1,7 +1,7 @@
 cask "miqat" do
   # version and sha256 are rewritten by .github/workflows/release.yml on every release.
-  version "0.1.0"
-  sha256 "0a25a8e3ff514e22a4f2ff1eea91b33c451fe9c06b78a971a68a94bd3f77e7f6"
+  version "0.2.0"
+  sha256 "b6b48f7ffff00c5cbc263e00d01c77088b54b47b82d3144961e01a984c9b1e72"
 
   url "https://github.com/aragabz/miqat/releases/download/v#{version}/Miqat_#{version}_universal.dmg"
   name "Miqat"
